@@ -2,141 +2,79 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Structure for Quadruple
-typedef struct {
-    int line;
-    char* op;
-    char* arg1;
-    char* arg2;
-    char* result;
-} Quadruple;
+#define MAX_LENGTH 100
 
-// Structure for Triple
-typedef struct {
-    int line;
-    char* op;
-    char* arg1;
-    char* arg2;
-} Triple;
+// Define operators and their priorities
+#define OPERATORS "+-*/="
+#define PRI_PLUSMINUS 1
+#define PRI_MULTDIV 2
 
-// Structure for Indirect Triple
-typedef struct {
-    int line;
-    char* op;
-    char* arg1;
-} IndirectTriple;
-
-int labelIndex = 0;
-int tempIndex = 0;
-
-char* generateLabel() {
-    char* label = (char*)malloc(10 * sizeof(char));
-    sprintf(label, "L%d", labelIndex++);
-    return label;
+// Function to check if a character is an operator
+int isOperator(char ch) {
+   return strchr(OPERATORS, ch) != NULL;
 }
 
-char* generateTemp() {
-    char* temp = (char*)malloc(10 * sizeof(char));
-    sprintf(temp, "t%d", tempIndex++);
-    return temp;
+// Function to convert infix expression to postfix
+void infix_to_postfix(char *formula, char *output) {
+   char stack[MAX_LENGTH];
+   int stack_top = 0;
+   output[0] = '\0';
+
+   for (int i = 0; formula[i] != '\0'; i++) {
+       char ch = formula[i];
+       if (!isOperator(ch)) {
+           strncat(output, &ch, 1);
+       } else if (ch == '(') {
+           stack[stack_top++] = '(';
+       } else if (ch == ')') {
+           while (stack_top > 0 && stack[stack_top - 1] != '(') {
+               output[strlen(output)] = stack[--stack_top];
+           }
+           stack_top--; // Pop '('
+       } else {
+           while (stack_top > 0 && stack[stack_top - 1] != '(' &&
+                  ((ch == '+' || ch == '-') ? PRI_PLUSMINUS : PRI_MULTDIV) <=
+                      ((stack[stack_top - 1] == '+' || stack[stack_top - 1] == '-') ? PRI_PLUSMINUS : PRI_MULTDIV)) {
+               output[strlen(output)] = stack[--stack_top];
+           }
+           stack[stack_top++] = ch;
+       }
+   }
+   // Leftover
+   while (stack_top > 0) {
+       output[strlen(output)] = stack[--stack_top];
+   }
 }
 
-void generateIfCode(char* condition, char* trueLabel, char* falseLabel, Quadruple* quadruples, int* quadIndex) {
-    quadruples[*quadIndex].line = *quadIndex;
-    quadruples[*quadIndex].op = "IF";
-    quadruples[*quadIndex].arg1 = condition;
-    quadruples[*quadIndex].arg2 = "";
-    quadruples[*quadIndex].result = trueLabel;
-    (*quadIndex)++;
+// Function to generate three address code
+void generate3AC(char *pos) {
+   printf("### THREE ADDRESS CODE GENERATION ###\n");
+   char exp_stack[MAX_LENGTH][MAX_LENGTH];
+   int stack_top = 0;
+   int t = 1;
 
-    quadruples[*quadIndex].line = *quadIndex;
-    quadruples[*quadIndex].op = "GOTO";
-    quadruples[*quadIndex].arg1 = falseLabel;
-    quadruples[*quadIndex].arg2 = "";
-    quadruples[*quadIndex].result = "";
-    (*quadIndex)++;
-}
-
-void generateWhileCode(char* condition, char* startLabel, char* endLabel, Quadruple* quadruples, int* quadIndex) {
-    quadruples[*quadIndex].line = *quadIndex;
-    quadruples[*quadIndex].op = "IF";
-    quadruples[*quadIndex].arg1 = condition;
-    quadruples[*quadIndex].arg2 = "";
-    quadruples[*quadIndex].result = endLabel;
-    (*quadIndex)++;
-
-    quadruples[*quadIndex].line = *quadIndex;
-    quadruples[*quadIndex].op = "GOTO";
-    quadruples[*quadIndex].arg1 = endLabel;
-    quadruples[*quadIndex].arg2 = "";
-    quadruples[*quadIndex].result = "";
-    (*quadIndex)++;
+   for (int i = 0; pos[i] != '\0'; i++) {
+       char ch = pos[i];
+       if (!isOperator(ch)) {
+           sprintf(exp_stack[stack_top++], "%c", ch);
+       } else {
+           printf("t%d := %s %c %s\n", t, exp_stack[stack_top - 2], ch, exp_stack[stack_top - 1]);
+           stack_top -= 2;
+           sprintf(exp_stack[stack_top++], "t%d", t++);
+       }
+   }
 }
 
 int main() {
-    // Initialize structures
-    Quadruple quadruples[20];
-    Triple triples[20];
-    IndirectTriple indirectTriples[20];
+   char expression[MAX_LENGTH];
+   printf("INPUT THE EXPRESSION: ");
+   fgets(expression, MAX_LENGTH, stdin);
+   expression[strcspn(expression, "\n")] = '\0'; // Remove newline character from input
 
-    // Initialize index counters
-    int quadIndex = 0, tripleIndex = 0, indTripleIndex = 0;
+   char postfix[MAX_LENGTH];
+   infix_to_postfix(expression, postfix);
 
-    char* ifCondition = "x < y";
-    char* ifTrueLabel = generateLabel();
-    char* ifFalseLabel = generateLabel();
-    generateIfCode(ifCondition, ifTrueLabel, ifFalseLabel, quadruples, &quadIndex);
+   generate3AC(postfix);
 
-    char* whileCondition = "i < 5";
-    char* whileStartLabel = generateLabel();
-    char* whileEndLabel = generateLabel();
-    generateWhileCode(whileCondition, whileStartLabel, whileEndLabel, quadruples, &quadIndex);
-
-    // Print Quadruples Table Header
-    printf("Quadruples Table:\n");
-    printf("| Line | Operation | Argument 1 | Argument 2 | Result |\n");
-    printf("|------|-----------|------------|------------|--------|\n");
-
-    // Print Quadruples
-    for (int i = 0; i < quadIndex; i++) {
-        printf("| %-4d | %-9s | %-10s | %-10s | %-6s |\n", quadruples[i].line, quadruples[i].op,
-               quadruples[i].arg1, quadruples[i].arg2, quadruples[i].result);
-    }
-
-    // Print Triples Table Header
-    printf("\nTriples Table:\n");
-    printf("| Line | Operation | Argument 1 | Argument 2 |\n");
-    printf("|------|-----------|------------|------------|\n");
-
-    // Print Triples (Dummy data for illustration)
-    triples[tripleIndex++] = (Triple){1, "IF", "x < y", ""};
-    triples[tripleIndex++] = (Triple){2, "GOTO", "L1", ""};
-    triples[tripleIndex++] = (Triple){3, "LABEL", "L1", ""};
-
-    for (int i = 0; i < tripleIndex; i++) {
-        printf("| %-4d | %-9s | %-10s | %-10s |\n", triples[i].line, triples[i].op,
-               triples[i].arg1, triples[i].arg2);
-    }
-
-    // Print Indirect Triples Table Header
-    printf("\nIndirect Triples Table:\n");
-    printf("| Line | Operation | Argument 1 |\n");
-    printf("|------|-----------|------------|\n");
-
-    // Print Indirect Triples (Dummy data for illustration)
-    indirectTriples[indTripleIndex++] = (IndirectTriple){1, "IF", "x < y"};
-    indirectTriples[indTripleIndex++] = (IndirectTriple){2, "GOTO", "L1"};
-    indirectTriples[indTripleIndex++] = (IndirectTriple){3, "LABEL", "L1"};
-
-    for (int i = 0; i < indTripleIndex; i++) {
-        printf("| %-4d | %-9s | %-10s |\n", indirectTriples[i].line, indirectTriples[i].op,
-               indirectTriples[i].arg1);
-    }
-
-    free(ifTrueLabel);
-    free(ifFalseLabel);
-    free(whileStartLabel);
-    free(whileEndLabel);
-
-    return 0;
+   return 0;
 }
